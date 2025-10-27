@@ -86,7 +86,7 @@ class DynamoDBProxy:
         """
         try:
             log_entry = {
-                'log_id': str(uuid_lib.uuid4()),
+                'id': str(uuid_lib.uuid4()),
                 'uuid': uuid,
                 'session': session,
                 'action': action,

@@ -1,5 +1,4 @@
 {
     "ID": "Prueba grupo set",
-    "ACTION": "set",
-    "localidad": "Concepcion del uruguay"
+    "ACTION": "get"
 }
