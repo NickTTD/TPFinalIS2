@@ -130,16 +130,8 @@ class SingletonClient:
         if action in ['get', 'set'] and 'ID' not in request_data:
             return False, f"La acción '{action}' requiere el campo 'ID'"
         
-        # Validar campos adicionales para set
-        if action == 'set':
-            required_fields = [
-                'cp', 'cuit', 'domicilio', 'idreq', 
-                'idseq', 'localidad', 'provincia', 'sede',
-                'seqID', 'telefono', 'web'
-            ]
-            missing_fields = [f for f in required_fields if f not in request_data]
-            if missing_fields:
-                return False, f"La acción 'set' requiere los campos: {', '.join(missing_fields)}"
+        # Para SET: el ID es obligatorio, pero los demás campos son opcionales
+        # Si no se informan, no se modificarán (si existe) o quedarán en blanco (si es nuevo)
         
         return True, ""
 

@@ -49,6 +49,7 @@ class DynamoDBProxy:
             self.session_counter += 1
             return f"SESSION-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self.session_counter}"
     
+    # DynamoDB requiere que todos los números sean Decimal, de eso se encargan las siguientes 2 funciones
     def _decimal_to_native(self, obj):
         """Convierte objetos Decimal a tipos nativos de Python"""
         if isinstance(obj, Decimal):

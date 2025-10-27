@@ -1,5 +1,5 @@
 {
-    "UUID": "auto-generado-si-no-se-incluye",
-    "ID": "Prueba grupo",
-    "ACTION": "get"
+    "ID": "Prueba grupo set",
+    "ACTION": "set",
+    "localidad": "Concepcion del uruguay"
 }
