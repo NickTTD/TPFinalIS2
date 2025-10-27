@@ -133,8 +133,9 @@ class SingletonClient:
         # Validar campos adicionales para set
         if action == 'set':
             required_fields = [
-                'company_name', 'industry', 'country', 'revenue', 
-                'employees', 'founded_year', 'ceo_name'
+                'cp', 'cuit', 'domicilio', 'idreq', 
+                'idseq', 'localidad', 'provincia', 'sede',
+                'seqID', 'telefono', 'web'
             ]
             missing_fields = [f for f in required_fields if f not in request_data]
             if missing_fields:
