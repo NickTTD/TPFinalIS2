@@ -1,234 +1,304 @@
 #!/usr/bin/env python3
 """
-setup_dynamodb_tables.py
-Script para crear las tablas necesarias en DynamoDB
+SingletonClient.py
+Cliente para interactuar con la base de datos CorporateData a través de SingleProxyObserverTPFI
+Ingeniería de Software II - UADER-FCyT-IS2
 """
 
-import boto3
-from botocore.exceptions import ClientError
+import socket
+import json
+import argparse
+import sys
+import uuid
+import platform
+from typing import Dict, Any, Optional
 
-def create_corporate_data_table():
-    """Crea la tabla CorporateData"""
-    dynamodb = boto3.resource('dynamodb')
+class SingletonClient:
+    """Cliente Singleton para comunicación con el servidor de base de datos"""
     
+    _instance = None
+    
+    def __new__(cls):
+        """Implementación del patrón Singleton"""
+        if cls._instance is None:
+            cls._instance = super(SingletonClient, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        """Inicializa el cliente si no ha sido inicializado antes"""
+        if self._initialized:
+            return
+        
+        self.host = 'localhost'
+        self.port = 8080
+        self.buffer_size = 8192
+        self._initialized = True
+    
+    def set_connection(self, host: str = 'localhost', port: int = 8080):
+        """Configura los parámetros de conexión"""
+        self.host = host
+        self.port = port
+    
+    def get_machine_uuid(self) -> str:
+        """
+        Obtiene un identificador único de la máquina.
+        Intenta usar el UUID del hardware, si no está disponible genera uno basado en el hostname.
+        """
+        try:
+            # Intenta obtener el UUID del hardware
+            machine_id = uuid.getnode()
+            machine_uuid = uuid.UUID(int=machine_id)
+            return str(machine_uuid)
+        except:
+            # Si falla, genera uno basado en el hostname
+            hostname = platform.node()
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, hostname))
+    
+    def send_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Envía una solicitud al servidor y espera respuesta.
+        
+        Args:
+            request_data: Diccionario con los datos de la solicitud
+            
+        Returns:
+            Diccionario con la respuesta del servidor
+        """
+        try:
+            # Crear socket TCP
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                # Configurar timeout
+                sock.settimeout(30)
+                
+                # Conectar al servidor
+                sock.connect((self.host, self.port))
+                
+                # Serializar y enviar datos
+                request_json = json.dumps(request_data, default=str)
+                sock.sendall(request_json.encode('utf-8'))
+                
+                # Recibir respuesta
+                response_data = b''
+                while True:
+                    chunk = sock.recv(self.buffer_size)
+                    if not chunk:
+                        break
+                    response_data += chunk
+                    
+                    # Intenta decodificar para ver si está completo
+                    try:
+                        response = json.loads(response_data.decode('utf-8'))
+                        return response
+                    except json.JSONDecodeError:
+                        continue
+                
+                # Si salimos del loop, intentamos decodificar lo que tenemos
+                if response_data:
+                    return json.loads(response_data.decode('utf-8'))
+                else:
+                    return {"Error": "No se recibió respuesta del servidor"}
+                
+        except socket.timeout:
+            return {"Error": "Timeout al conectar con el servidor"}
+        except ConnectionRefusedError:
+            return {"Error": f"No se pudo conectar al servidor en {self.host}:{self.port}"}
+        except Exception as e:
+            return {"Error": f"Error de comunicación: {str(e)}"}
+    
+    def validate_request(self, request_data: Dict[str, Any]) -> tuple[bool, str]:
+        """
+        Valida que la solicitud tenga el formato correcto.
+        
+        Returns:
+            Tupla (válido, mensaje_error)
+        """
+        # Validar campos obligatorios
+        if 'UUID' not in request_data:
+            return False, "Falta el campo 'UUID'"
+        
+        if 'ACTION' not in request_data:
+            return False, "Falta el campo 'ACTION'"
+        
+        action = request_data['ACTION'].lower()
+        
+        # Validar acción
+        if action not in ['get', 'set', 'list']:
+            return False, f"Acción inválida: {action}. Debe ser 'get', 'set' o 'list'"
+        
+        # Validar ID para get y set
+        if action in ['get', 'set'] and 'ID' not in request_data:
+            return False, f"La acción '{action}' requiere el campo 'ID'"
+        
+        # Validar campos adicionales para set
+        if action == 'set':
+            required_fields = [
+                'company_name', 'industry', 'country', 'revenue', 
+                'employees', 'founded_year', 'ceo_name'
+            ]
+            missing_fields = [f for f in required_fields if f not in request_data]
+            if missing_fields:
+                return False, f"La acción 'set' requiere los campos: {', '.join(missing_fields)}"
+        
+        return True, ""
+
+
+def load_input_file(filename: str) -> Optional[Dict[str, Any]]:
+    """
+    Carga el archivo JSON de entrada.
+    
+    Args:
+        filename: Nombre del archivo de entrada
+        
+    Returns:
+        Diccionario con los datos del archivo o None si hay error
+    """
     try:
-        table = dynamodb.create_table(
-            TableName='CorporateData',
-            KeySchema=[
-                {
-                    'AttributeName': 'id',
-                    'KeyType': 'HASH'  # Partition key
-                }
-            ],
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'id',
-                    'AttributeType': 'S'
-                }
-            ],
-            BillingMode='PAY_PER_REQUEST'  # On-demand, sin necesidad de provisionar capacidad
-        )
-        
-        print("Creando tabla CorporateData...")
-        table.wait_until_exists()
-        print("✓ Tabla CorporateData creada exitosamente")
-        return True
-        
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'ResourceInUseException':
-            print("✓ Tabla CorporateData ya existe")
-            return True
-        else:
-            print(f"✗ Error al crear tabla CorporateData: {e}")
-            return False
-
-
-def create_corporate_log_table():
-    """Crea la tabla CorporateLog"""
-    dynamodb = boto3.resource('dynamodb')
-    
-    try:
-        table = dynamodb.create_table(
-            TableName='CorporateLog',
-            KeySchema=[
-                {
-                    'AttributeName': 'log_id',
-                    'KeyType': 'HASH'  # Partition key
-                }
-            ],
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'log_id',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'uuid',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'timestamp',
-                    'AttributeType': 'S'
-                }
-            ],
-            GlobalSecondaryIndexes=[
-                {
-                    'IndexName': 'uuid-timestamp-index',
-                    'KeySchema': [
-                        {
-                            'AttributeName': 'uuid',
-                            'KeyType': 'HASH'
-                        },
-                        {
-                            'AttributeName': 'timestamp',
-                            'KeyType': 'RANGE'
-                        }
-                    ],
-                    'Projection': {
-                        'ProjectionType': 'ALL'
-                    }
-                }
-            ],
-            BillingMode='PAY_PER_REQUEST'
-        )
-        
-        print("Creando tabla CorporateLog...")
-        table.wait_until_exists()
-        print("✓ Tabla CorporateLog creada exitosamente")
-        return True
-        
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'ResourceInUseException':
-            print("✓ Tabla CorporateLog ya existe")
-            return True
-        else:
-            print(f"✗ Error al crear tabla CorporateLog: {e}")
-            return False
-
-
-def insert_sample_data():
-    """Inserta datos de ejemplo en CorporateData"""
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('CorporateData')
-    
-    sample_records = [
-        {
-            "id": "UADER-FCyT-IS2",
-            "cp": "3260",
-            "CUIT": "30-70925411-8",
-            "domicilio": "25 de Mayo 385-1P",
-            "idreq": "473",
-            "idSeq": "1146",
-            "localidad": "Concepción del Uruguay",
-            "provincia": "Entre Rios",
-            "sede": "FCyT",
-            "seqID": "23",
-            "telefono": "03442 43-1442",
-            "web": "http://www.uader.edu.ar"
-        },
-        {
-            "id": "UTN-FRP-001",
-            "cp": "3100",
-            "CUIT": "30-52653875-5",
-            "domicilio": "Almafuerte 1033",
-            "idreq": "100",
-            "idSeq": "500",
-            "localidad": "Paraná",
-            "provincia": "Entre Ríos",
-            "sede": "Facultad Regional Paraná",
-            "seqID": "10",
-            "telefono": "0343 422-4096",
-            "web": "https://www.frp.utn.edu.ar"
-        },
-        {
-            "id": "MUNI-CDU-001",
-            "cp": "3260",
-            "CUIT": "30-67890123-4",
-            "domicilio": "Supremo Entrerriano 101",
-            "idreq": "250",
-            "idSeq": "800",
-            "localidad": "Concepción del Uruguay",
-            "provincia": "Entre Ríos",
-            "sede": "Palacio Municipal",
-            "seqID": "15",
-            "telefono": "03442 42-5400",
-            "web": "https://www.cdeluruguay.gob.ar"
-        }
-    ]
-    
-    print("\nInsertando datos de ejemplo...")
-    
-    try:
-        for record in sample_records:
-            table.put_item(Item=record)
-            print(f"✓ Registro insertado: {record['id']}")
-        
-        print(f"\n✓ Se insertaron {len(sample_records)} registros de ejemplo")
-        return True
-        
+        with open(filename, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data
+    except FileNotFoundError:
+        print(f"Error: No se encontró el archivo '{filename}'", file=sys.stderr)
+        return None
+    except json.JSONDecodeError as e:
+        print(f"Error: El archivo '{filename}' no es un JSON válido: {e}", file=sys.stderr)
+        return None
     except Exception as e:
-        print(f"✗ Error al insertar datos de ejemplo: {e}")
+        print(f"Error al leer el archivo '{filename}': {e}", file=sys.stderr)
+        return None
+
+
+def save_output_file(filename: str, data: Dict[str, Any]) -> bool:
+    """
+    Guarda la respuesta en un archivo JSON.
+    
+    Args:
+        filename: Nombre del archivo de salida
+        data: Datos a guardar
+        
+    Returns:
+        True si se guardó correctamente, False en caso contrario
+    """
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, default=str, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error al escribir el archivo '{filename}': {e}", file=sys.stderr)
         return False
 
 
-def verify_tables():
-    """Verifica que las tablas existan y muestra su estado"""
-    dynamodb = boto3.client('dynamodb')
+def print_response(data: Dict[str, Any], verbose: bool = False):
+    """
+    Imprime la respuesta en formato legible.
     
-    print("\n" + "="*70)
-    print("VERIFICACIÓN DE TABLAS")
-    print("="*70)
+    Args:
+        data: Datos a imprimir
+        verbose: Si es True, imprime información adicional
+    """
+    if verbose:
+        print("=" * 70)
+        print("RESPUESTA DEL SERVIDOR")
+        print("=" * 70)
     
-    tables = ['CorporateData', 'CorporateLog']
+    print(json.dumps(data, indent=4, default=str, ensure_ascii=False))
     
-    for table_name in tables:
-        try:
-            response = dynamodb.describe_table(TableName=table_name)
-            table_info = response['Table']
-            
-            print(f"\nTabla: {table_name}")
-            print(f"  Estado: {table_info['TableStatus']}")
-            print(f"  Registros: {table_info['ItemCount']}")
-            print(f"  Partition Key: {table_info['KeySchema'][0]['AttributeName']}")
-            
-            if 'GlobalSecondaryIndexes' in table_info:
-                print(f"  Índices secundarios: {len(table_info['GlobalSecondaryIndexes'])}")
-        
-        except ClientError as e:
-            print(f"\n✗ Tabla {table_name} no encontrada: {e}")
+    if verbose:
+        print("=" * 70)
 
 
 def main():
-    """Función principal"""
-    print("="*70)
-    print("CONFIGURACIÓN DE TABLAS DYNAMODB")
-    print("="*70)
-    print()
+    """Función principal del cliente"""
     
-    # Crear tablas
-    success_data = create_corporate_data_table()
-    success_log = create_corporate_log_table()
+    # Configurar parser de argumentos
+    parser = argparse.ArgumentParser(
+        description='Cliente para interactuar con CorporateData',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos de uso:
+  python singletonclient.py -i=input.json
+  python singletonclient.py -i=input.json -o=output.json
+  python singletonclient.py -i=input.json -o=output.json -v
+  python singletonclient.py -i=input.json --host=192.168.1.100 --port=9090
+        """
+    )
     
-    if not (success_data and success_log):
-        print("\n✗ Hubo errores al crear las tablas")
-        return
+    parser.add_argument('-i', '--input', required=True,
+                        help='Archivo JSON de entrada (obligatorio)')
+    parser.add_argument('-o', '--output', required=False,
+                        help='Archivo JSON de salida (opcional, si no se indica se usa stdout)')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Modo verbose, muestra información adicional')
+    parser.add_argument('--host', default='localhost',
+                        help='Host del servidor (default: localhost)')
+    parser.add_argument('--port', type=int, default=8080,
+                        help='Puerto del servidor (default: 8080)')
     
-    # Insertar datos de ejemplo
-    print("\n¿Desea insertar datos de ejemplo? (s/n): ", end='')
-    response = input().strip().lower()
+    args = parser.parse_args()
     
-    if response == 's':
-        insert_sample_data()
+    # Modo verbose
+    if args.verbose:
+        print(f"SingletonClient - Cliente de CorporateData")
+        print(f"Conectando a {args.host}:{args.port}")
+        print(f"Leyendo archivo de entrada: {args.input}")
+        print()
     
-    # Verificar tablas
-    verify_tables()
+    # Cargar archivo de entrada
+    request_data = load_input_file(args.input)
+    if request_data is None:
+        sys.exit(1)
     
-    print("\n" + "="*70)
-    print("✓ Configuración completada")
-    print("="*70)
-    print("\nPuede iniciar el servidor con:")
-    print("  python SingletonProxyObserverTPFI.py")
-    print("  python SingletonProxyObserverTPFI.py -p 8080 -v")
-    print()
+    # Crear instancia del cliente (Singleton)
+    client = SingletonClient()
+    client.set_connection(args.host, args.port)
+    
+    # Agregar UUID si no está presente
+    if 'UUID' not in request_data:
+        request_data['UUID'] = client.get_machine_uuid()
+        if args.verbose:
+            print(f"UUID de la máquina: {request_data['UUID']}")
+    
+    # Validar solicitud
+    valid, error_msg = client.validate_request(request_data)
+    if not valid:
+        print(f"Error de validación: {error_msg}", file=sys.stderr)
+        sys.exit(1)
+    
+    if args.verbose:
+        print(f"Acción solicitada: {request_data['ACTION']}")
+        if 'ID' in request_data:
+            print(f"ID del registro: {request_data['ID']}")
+        print()
+    
+    # Enviar solicitud
+    if args.verbose:
+        print("Enviando solicitud al servidor...")
+    
+    response = client.send_request(request_data)
+    
+    if args.verbose:
+        print("Respuesta recibida.")
+        print()
+    
+    # Procesar respuesta
+    if args.output:
+        # Guardar en archivo
+        if save_output_file(args.output, response):
+            if args.verbose:
+                print(f"Respuesta guardada en: {args.output}")
+            else:
+                print(f"OK: Respuesta guardada en {args.output}")
+        else:
+            sys.exit(1)
+    else:
+        # Imprimir en stdout
+        print_response(response, args.verbose)
+    
+    # Verificar si hubo error
+    if "Error" in response:
+        sys.exit(1)
+    
+    sys.exit(0)
 
 
 if __name__ == '__main__':
