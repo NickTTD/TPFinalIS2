@@ -1,4 +1,5 @@
 {
     "ID": "Prueba grupo set",
-    "ACTION": "get"
+    "ACTION": "get",
+    "CUIT": "20304050607"
 }

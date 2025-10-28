@@ -42,18 +42,9 @@ class SingletonClient:
     
     def get_machine_uuid(self) -> str:
         """
-        Obtiene un identificador único de la máquina.
-        Intenta usar el UUID del hardware, si no está disponible genera uno basado en el hostname.
+        Obtiene un identificador único aleatorio para la máquina.
         """
-        try:
-            # Intenta obtener el UUID del hardware
-            machine_id = uuid.getnode()
-            machine_uuid = uuid.UUID(int=machine_id)
-            return str(machine_uuid)
-        except:
-            # Si falla, genera uno basado en el hostname
-            hostname = platform.node()
-            return str(uuid.uuid5(uuid.NAMESPACE_DNS, hostname))
+        return str(uuid.uuid4().hex)
     
     def send_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """

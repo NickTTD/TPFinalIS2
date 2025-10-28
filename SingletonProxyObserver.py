@@ -10,6 +10,7 @@ import json
 import argparse
 import sys
 import threading
+import logging
 import boto3
 from datetime import datetime
 from decimal import Decimal
@@ -183,7 +184,7 @@ class DynamoDBProxy:
             self.log_table.put_item(Item=entry_dict)
             return True
         except Exception as e:
-            print(f"Error al registrar log: {e}", file=sys.stderr)
+            logging.error(f"Error al registrar log: {e}")
             return False
     
     def get_record(self, record_id: str) -> Optional[CorporateDataRecord]:
@@ -197,7 +198,7 @@ class DynamoDBProxy:
             else:
                 return None
         except Exception as e:
-            print(f"Error al obtener registro {record_id}: {e}", file=sys.stderr)
+            logging.error(f"Error al obtener registro {record_id}: {e}")
             return None
     
     def list_records(self) -> List[CorporateDataRecord]:
@@ -221,7 +222,7 @@ class DynamoDBProxy:
             
             return records
         except Exception as e:
-            print(f"Error al listar registros: {e}", file=sys.stderr)
+            logging.error(f"Error al listar registros: {e}")
             return []
     
     def save_record(self, record: CorporateDataRecord) -> bool:
@@ -232,7 +233,7 @@ class DynamoDBProxy:
             self.data_table.put_item(Item=record_dict)
             return True
         except Exception as e:
-            print(f"Error al guardar registro {record.id}: {e}", file=sys.stderr)
+            logging.error(f"Error al guardar registro {record.id}: {e}")
             return False
 
 
@@ -272,7 +273,7 @@ class ClientObserver(Observer):
             message = json.dumps(data, default=str)
             self.client_socket.sendall(message.encode('utf-8'))
         except Exception as e:
-            print(f"Error al notificar cliente {self.uuid}: {e}", file=sys.stderr)
+            logging.error(f"Error al notificar cliente {self.uuid}: {e}")
             self._active = False
     
     def is_active(self) -> bool:
@@ -313,7 +314,7 @@ class ObserverManager:
         with self._lock:
             self.observers.append(observer)
             if isinstance(observer, ClientObserver):
-                print(f"Cliente {observer.uuid} suscrito. Total: {len(self.observers)}")
+                logging.info(f"Cliente {observer.uuid} suscrito. Total: {len(self.observers)}")
     
     def unsubscribe(self, observer: Observer):
         """Desuscribe un observer"""
@@ -322,7 +323,7 @@ class ObserverManager:
                 observer.close()
                 self.observers.remove(observer)
                 if isinstance(observer, ClientObserver):
-                    print(f"Cliente {observer.uuid} desuscrito. Total: {len(self.observers)}")
+                    logging.info(f"Cliente {observer.uuid} desuscrito. Total: {len(self.observers)}")
     
     def notify_all(self, data: Dict[str, Any]):
         """Notifica a todos los observers activos"""
@@ -351,10 +352,9 @@ class RequestHandler:
         self.verbose = verbose
     
     def log(self, message: str):
-        """Imprime mensaje si está en modo verbose"""
+        """Registra mensaje si está en modo verbose"""
         if self.verbose:
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print(f"[{timestamp}] {message}")
+            logging.debug(message)
     
     def handle_get(self, request: Dict[str, Any], session: str) -> Dict[str, Any]:
         """Maneja la acción GET"""
@@ -467,6 +467,40 @@ class RequestHandler:
             "uuid": uuid,
             "message": "Cliente suscrito exitosamente. Recibirá notificaciones de cambios."
         }
+    
+    def handle_unsubscribe(self, request: Dict[str, Any], session: str) -> Dict[str, Any]:
+        """Maneja la acción UNSUBSCRIBE"""
+        uuid = request.get('UUID', 'unknown')
+        
+        self.log(f"UNSUBSCRIBE solicitado - UUID: {uuid}")
+        logging.info(f"Cliente {uuid} solicitó desuscripción")
+        
+        # Registrar en log
+        log_entry = LogEntry(uuid, session, 'unsubscribe')
+        self.proxy.log_action(log_entry)
+        
+        # Buscar y desuscribir el cliente
+        observer_to_remove = None
+        with self.observer_manager._lock:
+            for observer in self.observer_manager.observers:
+                if isinstance(observer, ClientObserver) and observer.uuid == uuid:
+                    observer_to_remove = observer
+                    break
+
+        if observer_to_remove:
+            self.observer_manager.unsubscribe(observer_to_remove)
+            return {
+                "status": "unsubscribed",
+                "uuid": uuid,
+                "message": "Cliente desuscrito exitosamente."
+            }
+        
+        return {
+            "status": "not_found",
+            "uuid": uuid,
+            "message": "Cliente no encontrado en la lista de suscriptores."
+        }
+
 
 
 class ClientConnection:
@@ -499,7 +533,7 @@ class ClientConnection:
             
             return None
         except Exception as e:
-            self.request_handler.log(f"Error al recibir datos: {e}")
+            logging.debug(f"Error al recibir datos: {e}")
             return None
     
     def send_response(self, response: Dict[str, Any]):
@@ -508,7 +542,7 @@ class ClientConnection:
             response_json = json.dumps(response, default=str)
             self.client_socket.sendall(response_json.encode('utf-8'))
         except Exception as e:
-            self.request_handler.log(f"Error al enviar respuesta: {e}")
+            logging.debug(f"Error al enviar respuesta: {e}")
     
     def process(self):
         """Procesa la conexión del cliente"""
@@ -540,6 +574,9 @@ class ClientConnection:
                     request, self.session, self.client_socket
                 )
                 keep_alive = True  # No cerrar socket para suscripciones
+            elif action == 'unsubscribe':
+                response = self.request_handler.handle_unsubscribe(request, self.session)
+                # keep_alive se mantiene False para cerrar la conexión
             else:
                 response = {"Error": f"Acción desconocida: {action}"}
             
@@ -547,8 +584,10 @@ class ClientConnection:
             if response:
                 self.send_response(response)
             
-            # Cerrar conexión si no es suscripción
-            if not keep_alive:
+            # Si es suscripción, seguir escuchando por si llega unsubscribe
+            if keep_alive:
+                self.listen_for_unsubscribe()
+            else:
                 self.close()
         
         except json.JSONDecodeError as e:
@@ -568,6 +607,61 @@ class ClientConnection:
             self.request_handler.log(f"Conexión cerrada con {self.address}")
         except:
             pass
+    
+    def listen_for_unsubscribe(self):
+        """Escucha por mensajes adicionales del cliente suscrito (principalmente UNSUBSCRIBE)"""
+        self.request_handler.log(f"Manteniendo conexión abierta para {self.address}")
+        
+        try:
+            # Configurar timeout para no bloquear indefinidamente
+            self.client_socket.settimeout(1.0)
+            data = b''
+            
+            while True:
+                try:
+                    # Intentar recibir datos
+                    chunk = self.client_socket.recv(self.buffer_size)
+                    
+                    if not chunk:
+                        # Socket cerrado por el cliente (recv retorna b'' cuando se cierra)
+                        self.request_handler.log(f"Cliente {self.address} cerró la conexión")
+                        break
+                    
+                    data += chunk
+                    
+                    # Intentar decodificar JSON
+                    try:
+                        request = json.loads(data.decode('utf-8'))
+                        action = request.get('ACTION', '').lower()
+                        self.request_handler.log(f"Acción recibida en suscripción: {action}")
+                        
+                        if action == 'unsubscribe':
+                            # Procesar unsubscribe
+                            response = self.request_handler.handle_unsubscribe(request, self.session)
+                            self.send_response(response)
+                            break
+                        else:
+                            # Acción no permitida en estado suscrito
+                            error_response = {"Error": f"Acción '{action}' no permitida en estado suscrito"}
+                            self.send_response(error_response)
+                            # Resetear buffer
+                            data = b''
+                    except json.JSONDecodeError:
+                        # JSON incompleto, seguir acumulando
+                        continue
+                
+                except socket.timeout:
+                    # Timeout es normal, seguir esperando
+                    continue
+                except ConnectionResetError:
+                    self.request_handler.log(f"Cliente {self.address} resetó la conexión")
+                    break
+                except Exception as e:
+                    self.request_handler.log(f"Error al escuchar cliente suscrito: {e}")
+                    break
+        
+        finally:
+            self.close()
 
 
 class SingletonProxyObserverServer:
@@ -607,15 +701,14 @@ class SingletonProxyObserverServer:
             server_socket.bind(('0.0.0.0', self.port))
             server_socket.listen(5)
             
-            print(f"{'='*70}")
-            print(f"SingletonProxyObserverTPFI - Servidor iniciado (OOP)")
-            print(f"{'='*70}")
-            print(f"Escuchando en puerto: {self.port}")
-            print(f"Modo verbose: {'Activado' if self.verbose else 'Desactivado'}")
-            print(f"Tablas DynamoDB: CorporateData, CorporateLog")
-            print(f"{'='*70}")
-            print("Esperando conexiones...")
-            print()
+            logging.info("="*70)
+            logging.info("SingletonProxyObserverTPFI - Servidor iniciado (OOP)")
+            logging.info("="*70)
+            logging.info(f"Escuchando en puerto: {self.port}")
+            logging.info(f"Modo verbose: {'Activado' if self.verbose else 'Desactivado'}")
+            logging.info(f"Tablas DynamoDB: CorporateData, CorporateLog")
+            logging.info("="*70)
+            logging.info("Esperando conexiones...")
             
             while self.running:
                 try:
@@ -630,16 +723,16 @@ class SingletonProxyObserverServer:
                     client_thread.start()
                 
                 except KeyboardInterrupt:
-                    print("\nDeteniendo servidor...")
+                    logging.info("Deteniendo servidor...")
                     break
                 except Exception as e:
                     if self.running:
-                        print(f"Error al aceptar conexión: {e}", file=sys.stderr)
+                        logging.error(f"Error al aceptar conexión: {e}")
         
         finally:
             self.running = False
             server_socket.close()
-            print("Servidor detenido.")
+            logging.info("Servidor detenido.")
 
 
 def main():
@@ -649,6 +742,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
+    parser.add_argument('start', nargs='?', help='Inicia el servidor si se incluye este argumento')
     parser.add_argument('-p', '--port', type=int, default=8080,
                         help='Puerto en el que escuchará el servidor (default: 8080)')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -656,16 +750,42 @@ def main():
     
     args = parser.parse_args()
     
+    if args.start != 'start':
+        print("""
+Uso del servidor SingletonProxyObserver:
+
+  python SingletonProxyObserver.py start [opciones]
+
+Opciones:
+  -p, --port <número>    Puerto en el que escuchará el servidor (default: 8080)
+  -v, --verbose          Activa el modo verbose (muestra logs detallados)
+
+Ejemplos:
+  python SingletonProxyObserver.py start
+  python SingletonProxyObserver.py start -p 9090 -v
+
+Si no se incluye 'start', el servidor no se inicia y se muestra esta ayuda.
+""")
+        sys.exit(0)
+    
+    # logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='[%(asctime)s] [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
     # Crear y arrancar servidor
     server = SingletonProxyObserverServer(port=args.port, verbose=args.verbose)
     
     try:
         server.start()
     except KeyboardInterrupt:
-        print("\n\nServidor detenido por el usuario.")
+        logging.info("Servidor detenido por el usuario.")
         sys.exit(0)
     except Exception as e:
-        print(f"Error fatal: {e}", file=sys.stderr)
+        logging.critical(f"Error fatal: {e}")
         sys.exit(1)
 
 

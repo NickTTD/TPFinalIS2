@@ -12,8 +12,10 @@ import sys
 import time
 import uuid
 import platform
+import logging
 from datetime import datetime
 from typing import Optional
+
 
 class ObserverClient:
     """Cliente que se suscribe para recibir notificaciones de cambios"""
@@ -32,10 +34,7 @@ class ObserverClient:
         self.uuid = self.get_machine_uuid()
     
     def get_machine_uuid(self) -> str:
-        """
-        Obtiene un identificador único de la máquina.
-        Intenta usar el UUID del hardware, si no está disponible genera uno basado en el hostname.
-        """
+        """Obtiene un identificador único de la máquina."""
         try:
             machine_id = uuid.getnode()
             machine_uuid = uuid.UUID(int=machine_id)
@@ -44,73 +43,51 @@ class ObserverClient:
             hostname = platform.node()
             return str(uuid.uuid5(uuid.NAMESPACE_DNS, hostname))
     
-    def log(self, message: str, level: str = "INFO"):
-        """Imprime mensaje si está en modo verbose"""
-        if self.verbose:
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print(f"[{timestamp}] [{level}] {message}", file=sys.stderr)
-    
     def connect(self) -> bool:
-        """
-        Establece conexión con el servidor y envía solicitud de suscripción.
-        
-        Returns:
-            True si la conexión fue exitosa, False en caso contrario
-        """
+        """Establece conexión con el servidor y envía solicitud de suscripción."""
         try:
-            # Cerrar socket existente si hay uno
             if self.sock:
                 try:
                     self.sock.close()
                 except:
                     pass
             
-            # Crear nuevo socket
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(10)  # Timeout para conectar
+            self.sock.settimeout(10)
             
-            self.log(f"Intentando conectar a {self.host}:{self.port}...")
+            logging.info(f"Intentando conectar a {self.host}:{self.port}...")
             self.sock.connect((self.host, self.port))
-            self.log(f"✓ Conectado a {self.host}:{self.port}", "SUCCESS")
+            logging.info(f"✓ Conectado a {self.host}:{self.port}")
             
-            # Enviar solicitud de suscripción
             subscribe_request = {
                 "UUID": self.uuid,
                 "ACTION": "subscribe"
             }
             
-            self.log(f"Enviando solicitud de suscripción...")
+            logging.debug("Enviando solicitud de suscripción...")
             request_json = json.dumps(subscribe_request)
             self.sock.sendall(request_json.encode('utf-8'))
-            
-            # Eliminar timeout para recibir datos (permanece abierto)
             self.sock.settimeout(None)
             
-            # Recibir confirmación de suscripción
             response = self.receive_message()
             if response:
-                self.log(f"Respuesta de suscripción: {json.dumps(response)}", "SUCCESS")
+                logging.debug(f"Respuesta de suscripción: {json.dumps(response)}")
                 self.print_notification(response, is_subscription=True)
             
             return True
             
         except socket.timeout:
-            self.log(f"Timeout al conectar con {self.host}:{self.port}", "ERROR")
+            logging.warning(f"Timeout al conectar con {self.host}:{self.port}")
             return False
         except ConnectionRefusedError:
-            self.log(f"Conexión rechazada por {self.host}:{self.port}", "ERROR")
+            logging.error(f"Conexión rechazada por {self.host}:{self.port}")
             return False
         except Exception as e:
-            self.log(f"Error al conectar: {e}", "ERROR")
+            logging.error(f"Error al conectar: {e}")
             return False
     
     def receive_message(self) -> Optional[dict]:
-        """
-        Recibe un mensaje JSON del servidor.
-        
-        Returns:
-            Diccionario con el mensaje o None si hay error
-        """
+        """Recibe un mensaje JSON del servidor."""
         try:
             data = b''
             buffer_size = 8192
@@ -119,44 +96,32 @@ class ObserverClient:
                 chunk = self.sock.recv(buffer_size)
                 
                 if not chunk:
-                    # Conexión cerrada por el servidor
                     return None
                 
                 data += chunk
-                
-                # Intentar decodificar el JSON
                 try:
                     message = json.loads(data.decode('utf-8'))
                     return message
                 except json.JSONDecodeError:
-                    # JSON incompleto, seguir recibiendo
                     continue
                     
         except socket.timeout:
-            self.log("Timeout al recibir mensaje", "WARNING")
+            logging.warning("Timeout al recibir mensaje")
             return None
         except ConnectionResetError:
-            self.log("Conexión reiniciada por el servidor", "WARNING")
+            logging.warning("Conexión reiniciada por el servidor")
             return None
         except Exception as e:
-            self.log(f"Error al recibir mensaje: {e}", "ERROR")
+            logging.error(f"Error al recibir mensaje: {e}")
             return None
     
     def print_notification(self, notification: dict, is_subscription: bool = False):
-        """
-        Imprime y guarda una notificación.
-        
-        Args:
-            notification: Diccionario con la notificación
-            is_subscription: Si es True, indica que es la confirmación de suscripción
-        """
+        """Imprime y guarda una notificación."""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Incrementar contador solo si no es suscripción
         if not is_subscription:
             self.notification_count += 1
         
-        # Preparar salida
         output = {
             "timestamp": timestamp,
             "notification_number": self.notification_count if not is_subscription else 0,
@@ -164,7 +129,6 @@ class ObserverClient:
             "data": notification
         }
         
-        # Mostrar en stdout
         print("=" * 70)
         if is_subscription:
             print("CONFIRMACIÓN DE SUSCRIPCIÓN")
@@ -178,22 +142,18 @@ class ObserverClient:
         print()
         sys.stdout.flush()
         
-        # Guardar en archivo si fue especificado
         if self.output_file:
             try:
                 with open(self.output_file, 'a', encoding='utf-8') as f:
                     json.dump(output, f, indent=4, default=str, ensure_ascii=False)
                     f.write('\n')
                 
-                self.log(f"Notificación guardada en {self.output_file}")
+                logging.info(f"Notificación guardada en {self.output_file}")
             except Exception as e:
-                self.log(f"Error al guardar en archivo: {e}", "ERROR")
+                logging.error(f"Error al guardar en archivo: {e}")
     
     def listen(self):
-        """
-        Escucha continuamente las notificaciones del servidor.
-        Maneja reconexiones automáticas en caso de desconexión.
-        """
+        """Escucha continuamente las notificaciones del servidor."""
         self.running = True
         
         print("=" * 70)
@@ -207,9 +167,8 @@ class ObserverClient:
         print("=" * 70)
         print()
         
-        # Intentar conexión inicial
         while self.running and not self.connect():
-            self.log(f"Reintentando en {self.retry_interval} segundos...")
+            logging.warning(f"Reintentando en {self.retry_interval} segundos...")
             time.sleep(self.retry_interval)
         
         if not self.running:
@@ -219,37 +178,31 @@ class ObserverClient:
         print("  (Presione Ctrl+C para detener)")
         print()
         
-        # Loop principal de recepción
         while self.running:
             try:
-                # Recibir notificación
                 notification = self.receive_message()
                 
                 if notification is None:
-                    # Conexión perdida
-                    self.log("Conexión perdida. Intentando reconectar...", "WARNING")
-                    
-                    # Intentar reconexión
+                    logging.warning("Conexión perdida. Intentando reconectar...")
                     reconnected = False
                     while self.running and not reconnected:
-                        self.log(f"Reintentando conexión en {self.retry_interval} segundos...")
+                        logging.info(f"Reintentando conexión en {self.retry_interval} segundos...")
                         time.sleep(self.retry_interval)
                         reconnected = self.connect()
                     
                     if reconnected:
-                        self.log("✓ Reconectado exitosamente", "SUCCESS")
+                        logging.info("✓ Reconectado exitosamente")
                     
                     continue
                 
-                # Procesar notificación
                 self.print_notification(notification)
                 
             except KeyboardInterrupt:
                 print("\n\nDeteniendo cliente...")
                 break
             except Exception as e:
-                self.log(f"Error inesperado: {e}", "ERROR")
-                self.log(f"Reintentando en {self.retry_interval} segundos...")
+                logging.error(f"Error inesperado: {e}")
+                logging.info(f"Reintentando en {self.retry_interval} segundos...")
                 time.sleep(self.retry_interval)
         
         self.stop()
@@ -260,8 +213,20 @@ class ObserverClient:
         
         if self.sock:
             try:
+                unsubscribe_request = {
+                    "UUID": self.uuid,
+                    "ACTION": "unsubscribe"
+                }
+                request_json = json.dumps(unsubscribe_request)
+                self.sock.sendall(request_json.encode('utf-8'))
+                logging.info("Mensaje de desuscripción enviado")
+                time.sleep(0.1)
+            except:
+                pass
+            
+            try:
                 self.sock.close()
-                self.log("Conexión cerrada")
+                logging.info("Conexión cerrada")
             except:
                 pass
         
@@ -287,10 +252,6 @@ Ejemplos de uso:
   python observerclient.py -s=192.168.1.100 -p=9090 -o=notifications.json
   python observerclient.py -o=notifications.json -v
   python observerclient.py -s=localhost -p=8080 -o=output.json -v --retry=60
-
-El cliente se mantendrá escuchando notificaciones hasta que se detenga
-manualmente con Ctrl+C. En caso de pérdida de conexión, reintentará
-automáticamente cada 30 segundos (o el intervalo configurado).
         """
     )
     
@@ -307,13 +268,18 @@ automáticamente cada 30 segundos (o el intervalo configurado).
     
     args = parser.parse_args()
     
-    # Validar argumentos
     if args.retry < 5:
-        print("Error: El intervalo de reintento debe ser al menos 5 segundos", 
-              file=sys.stderr)
+        print("Error: El intervalo de reintento debe ser al menos 5 segundos", file=sys.stderr)
         sys.exit(1)
     
-    # Crear cliente
+    # Configurar logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='[%(asctime)s] [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
     client = ObserverClient(
         host=args.server,
         port=args.port,
@@ -323,15 +289,14 @@ automáticamente cada 30 segundos (o el intervalo configurado).
     )
     
     try:
-        # Iniciar escucha
         client.listen()
         sys.exit(0)
     except KeyboardInterrupt:
-        print("\n\nCliente detenido por el usuario.")
+        logging.info("Cliente detenido por el usuario.")
         client.stop()
         sys.exit(0)
     except Exception as e:
-        print(f"Error fatal: {e}", file=sys.stderr)
+        logging.critical(f"Error fatal: {e}")
         client.stop()
         sys.exit(1)
 
