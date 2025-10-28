@@ -1,0 +1,10 @@
+{
+    "ACTION": "set",
+    "ID": "EMP_JSON_001",
+    "cp": "3100",
+    "CUIT": "20-98765432-1",
+    "domicilio": "San Martín 789",
+    "localidad": "Concepción del Uruguay",
+    "provincia": "Entre Ríos",
+    "telefono": "3442-123456"
+}

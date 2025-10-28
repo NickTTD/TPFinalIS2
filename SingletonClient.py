@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 SingletonClient.py
 Cliente para interactuar con la base de datos CorporateData a través de SingleProxyObserverTPFI

@@ -1,0 +1,83 @@
+================================================================================
+REPORTE DE TEST DE ACEPTACIÓN
+SingletonClient & SingletonProxyObserverServer
+================================================================================
+
+Fecha: 2025-10-28 16:45:04
+
+CASOS DE PRUEBA EJECUTADOS:
+
+1. CAMINO FELIZ (4 tests)
+   ✅ CREATE - Crear nuevo registro con todos los campos
+   ✅ GET - Obtener registro existente
+   ✅ UPDATE - Actualizar registro (merge de datos)
+   ✅ LIST - Listar todos los registros con count
+   ✅ Verificación automática de logs en CorporateLog
+
+2. ARGUMENTOS MALFORMADOS (5 tests)
+   ✅ Falta campo ACTION
+   ✅ Falta campo UUID
+   ✅ ACTION inválida (delete, etc)
+   ✅ Falta ID para GET
+   ✅ Falta ID para SET
+
+3. DATOS MÍNIMOS NECESARIOS (3 tests)
+   ✅ SET solo con ID (defaults: CorporateDataRecord)
+   ✅ GET solo con ID
+   ✅ LIST solo con ACTION
+
+4. MANEJO DE SERVIDOR CAÍDO (2 tests)
+   ✅ Conexión rechazada (puerto incorrecto)
+   ✅ Timeout de conexión (host inexistente)
+
+5. SERVIDOR DUPLICADO (1 test)
+   ✅ Prevención de múltiples instancias (socket bind error)
+
+6. INTEGRACIÓN CON ARCHIVOS JSON (3 tests)
+   ✅ Crear desde test_crear.json
+   ✅ Obtener desde test_get.json
+   ✅ Actualizar desde test_update.json
+
+7. INTEGRACIÓN CLI (5 tests)
+   ✅ CLI sin argumento -i (requerido)
+   ✅ Archivo inexistente
+   ✅ JSON malformado
+   ✅ Modo verbose (-v)
+   ✅ Host y puerto personalizados (--host --port)
+
+8. PATRÓN OBSERVER (2 tests)
+   ✅ Validación de acción SUBSCRIBE
+   ✅ Validación de acción UNSUBSCRIBE
+
+================================================================================
+TOTAL: 25 casos de prueba
+================================================================================
+
+ARQUITECTURA DEL SISTEMA:
+
+SERVIDOR (SingletonProxyObserverTPFI.py):
+  - DynamoDBProxy (Singleton): Acceso a AWS DynamoDB
+    * Tablas: CorporateData, CorporateLog
+    * Conversión automática de Decimal
+  - ObserverManager (Singleton + Observer):
+    * Gestión de suscriptores (ClientObserver)
+    * Notificaciones automáticas en cambios
+  - SessionManager (Singleton): IDs únicos por sesión
+  - RequestHandler: Procesamiento de acciones
+  - LogEntry: Registro automático en CorporateLog
+  - CorporateDataRecord: Modelo con defaults
+
+CLIENTE (SingletonClient.py):
+  - Patrón Singleton
+  - Validación local de requests
+  - Manejo de errores de red
+  - CLI con argparse
+
+PATRONES DE DISEÑO IMPLEMENTADOS:
+  ✓ Singleton (Cliente, Proxy, SessionManager, ObserverManager)
+  ✓ Proxy (DynamoDBProxy - acceso a DynamoDB)
+  ✓ Observer (Notificaciones a clientes suscritos)
+  ✓ Factory (CorporateDataRecord.from_dict)
+  ✓ Command (RequestHandler con handle_*)
+
+================================================================================

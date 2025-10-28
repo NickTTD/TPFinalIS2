@@ -1,0 +1,10 @@
+{
+    "timestamp": "2025-10-28 16:40:16",
+    "notification_number": 0,
+    "type": "subscription_confirmation",
+    "data": {
+        "status": "subscribed",
+        "uuid": "00000000-0000-0000-0000-74563c591fce",
+        "message": "Cliente suscrito exitosamente. Recibirá notificaciones de cambios."
+    }
+}

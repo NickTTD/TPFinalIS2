@@ -1,0 +1,8 @@
+{
+    "ACTION": "set",
+    "ID": "EMP_JSON_001",
+    "cp": "3101",
+    "domicilio": "San Martín 999",
+    "telefono": "3442-999888",
+    "web": "www.empresa-actualizada.com.ar"
+}
