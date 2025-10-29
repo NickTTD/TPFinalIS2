@@ -1,7 +1,7 @@
 Desarrollo del TP Final de Ingeniería de Software 2
 
 
-Integrantes:
+## Integrantes:
 
 Díaz Nicolás
 
