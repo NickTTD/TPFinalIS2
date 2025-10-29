@@ -1,5 +1,6 @@
 {
     "ID": "Prueba grupo set",
-    "ACTION": "get",
-    "CUIT": "20304050607"
+    "ACTION": "set",
+    "telefono": "034474335066"
+    
 }
