@@ -175,23 +175,27 @@ while True:
     page, total_pages = display_page(items_sorted, page)
     
     try:
-        key = get_key_press().lower()
+        key = get_key_press()
         
-        if key == 'q':
-            print("\nSaliendo...")
-            break
-        elif key == '\xe0':  # Windows: flechas envían secuencia especial
-            next_key = get_key_press()
-            if next_key == 'H':  # Flecha arriba
+        # Manejar Windows (tupla de bytes)
+        if isinstance(key, tuple):
+            first, second = key
+            if second == b'H':  # Flecha arriba
                 page = max(0, page - 1)
-            elif next_key == 'P':  # Flecha abajo
+            elif second == b'P':  # Flecha abajo
                 page = min(total_pages - 1, page + 1)
-        elif key == '\x1b':  # Unix: escape
-            next_key = sys.stdin.read(2)
-            if next_key == '[A':  # Flecha arriba
-                page = max(0, page - 1)
-            elif next_key == '[B':  # Flecha abajo
-                page = min(total_pages - 1, page + 1)
+        # Manejar Unix (string)
+        else:
+            key_lower = key.lower()
+            if key_lower == 'q':
+                print("\nSaliendo...")
+                break
+            elif key == '\x1b':  # Escape
+                next_key = sys.stdin.read(2)
+                if next_key == '[A':  # Flecha arriba
+                    page = max(0, page - 1)
+                elif next_key == '[B':  # Flecha abajo
+                    page = min(total_pages - 1, page + 1)
     except KeyboardInterrupt:
         print("\n\nInterrumpido por el usuario.")
         break
