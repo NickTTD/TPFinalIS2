@@ -7,6 +7,7 @@ Muestra los 10 elementos más recientes con navegación por páginas
 import boto3
 import json
 from datetime import datetime, timezone
+import pytz
 import sys
 import os
 
@@ -137,18 +138,22 @@ def display_page(items_sorted, page):
     return page, total_pages
 
 def get_key_press():
-    """Obtiene una tecla presionada sin Enter"""
-    import tty
-    import termios
-    
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    return ch
+    """Obtiene una tecla presionada sin Enter (funciona en Windows y Unix)"""
+    if os.name == 'nt':  # Windows
+        import msvcrt
+        return msvcrt.getch().decode('utf-8', errors='ignore')
+    else:  # Linux/Mac
+        import tty
+        import termios
+        
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
 
 # Programa principal
 if not items:
