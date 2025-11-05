@@ -1,0 +1,15 @@
+{
+    "ACTION": "set",
+    "ID": "MFND-001",
+    "web": "https://www.test.com",
+    "CUIT": "30-52653875-5",
+    "localidad": "Herrera",
+    "provincia": "Entre Ríos",
+    "telefono": "0343 422-4096",
+    "domicilio": "Almafuerte 1033",
+    "cp": "3100",
+    "sede": "Facultad Regional Concepción del Uruguay",
+    "idreq": "UTN-001",
+    "idSeq": "2001",
+    "seqID": "100"
+}

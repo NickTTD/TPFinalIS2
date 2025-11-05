@@ -3,20 +3,23 @@
 SingletonProxyObserverTPFI.py - Versión OOP mejorada
 Servidor Proxy con patrón Singleton y Observer para gestión de CorporateData
 Ingeniería de Software II - UADER-FCyT-IS2
+
+ESTE ES EL CÓDIGO VIEJO MONOLÍTICO QUE FUE REFACTORIZADO EN LA CARPETA SERVIDOR
 """
 
-import socket
-import json
+from abc import ABC, abstractmethod
 import argparse
-import sys
-import threading
-import logging
-import boto3
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Any, List, Optional
-from abc import ABC, abstractmethod
+import json
+import logging
+import socket
+import sys
+import threading
+from typing import Any, Dict, List, Optional
 import uuid as uuid_lib
+
+import boto3
 
 
 class DecimalConverter:
@@ -64,14 +67,11 @@ class SessionManager:
     def __init__(self):
         if self._initialized:
             return
-        self.counter = 0
         self._initialized = True
     
     def generate_id(self) -> str:
-        """Genera un ID de sesión único"""
-        with self._lock:
-            self.counter += 1
-            return f"SESSION-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self.counter}"
+        """Genera un ID de sesión único con uuid4(random)"""
+        return str(uuid_lib.uuid4()) 
 
 
 class LogEntry:
@@ -505,7 +505,7 @@ class RequestHandler:
 
 class ClientConnection:
     """Maneja una conexión individual de cliente"""
-    
+  
     def __init__(self, client_socket: socket.socket, address: tuple,
                  request_handler: RequestHandler, session: str):
         self.client_socket = client_socket
@@ -694,7 +694,7 @@ class SingletonProxyObserverServer:
         """Inicia el servidor"""
         self.running = True
         
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Stream = TCP
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         
         try:

@@ -1,6 +1,11 @@
 {
+<<<<<<< HEAD
     "ID": "Prueba grupo set",
     "ACTION": "set",
     "telefono": "034474335066"
     
+=======
+    "ID": "MFND-001",
+    "ACTION": "get"
+>>>>>>> 4ba1c53 (Refactor SingletonProxyObserver - Servidor)
 }
