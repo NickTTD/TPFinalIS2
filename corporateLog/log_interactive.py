@@ -141,7 +141,12 @@ def get_key_press():
     """Obtiene una tecla presionada sin Enter (funciona en Windows y Unix)"""
     if os.name == 'nt':  # Windows
         import msvcrt
-        return msvcrt.getch().decode('utf-8', errors='ignore')
+        key = msvcrt.getch()
+        # Si es una tecla especial (flechas), obtener el segundo byte
+        if key == b'\xe0' or key == b'\x00':
+            key2 = msvcrt.getch()
+            return (key, key2)
+        return key
     else:  # Linux/Mac
         import tty
         import termios
@@ -175,7 +180,13 @@ while True:
         if key == 'q':
             print("\nSaliendo...")
             break
-        elif key == '\x1b':  # Secuencia de escape (flechas)
+        elif key == '\xe0':  # Windows: flechas envían secuencia especial
+            next_key = get_key_press()
+            if next_key == 'H':  # Flecha arriba
+                page = max(0, page - 1)
+            elif next_key == 'P':  # Flecha abajo
+                page = min(total_pages - 1, page + 1)
+        elif key == '\x1b':  # Unix: escape
             next_key = sys.stdin.read(2)
             if next_key == '[A':  # Flecha arriba
                 page = max(0, page - 1)
