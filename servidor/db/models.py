@@ -6,7 +6,6 @@ LogEntry y CorporateDataRecord
 
 import json
 import uuid as uuid_lib
-import platform
 from datetime import datetime
 from typing import Any, Dict, Optional
 

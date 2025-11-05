@@ -51,7 +51,7 @@ class SingletonProxyObserverServer:
             server_socket.listen(5)
             
             logging.info("="*70)
-            logging.info("SingletonProxyObserverTPFI - Servidor iniciado (OOP)")
+            logging.info("SingletonProxyObserver - Servidor iniciado")
             logging.info("="*70)
             logging.info(f"Escuchando en puerto: {self.port}")
             logging.info(f"Modo verbose: {'Activado' if self.verbose else 'Desactivado'}")
