@@ -3,6 +3,7 @@
 test_acceptance_singleton_client.py
 Test de Aceptación según Especificación de Validación y Verificación
 Ingeniería de Software II - UADER-FCyT-IS2
+Adaptado para estructura modular del servidor
 """
 
 import unittest
@@ -52,8 +53,8 @@ class TestAcceptanceSingletonClient(unittest.TestCase):
     
     @classmethod
     def start_server(cls):
-        """Inicia el servidor SingletonProxyObserverServer"""
-        print("\n[SETUP] Iniciando SingletonProxyObserverServer...")
+        """Inicia el servidor desde la carpeta servidor/main.py"""
+        print("\n[SETUP] Iniciando servidor desde carpeta servidor/...")
         
         # Verificar si el puerto está ocupado
         if cls.is_port_in_use(8080):
@@ -61,7 +62,7 @@ class TestAcceptanceSingletonClient(unittest.TestCase):
             cls.kill_process_on_port(8080)
             time.sleep(2)
         
-        # Buscar el archivo del servidor
+        # Buscar el archivo main.py del servidor
         server_file = cls.find_server_file()
         
         if server_file and server_file.exists():
@@ -70,14 +71,15 @@ class TestAcceptanceSingletonClient(unittest.TestCase):
                     [sys.executable, str(server_file), 'start', '-p', '8080'],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True
+                    text=True,
+                    cwd=str(server_file.parent)  # Ejecutar desde carpeta servidor
                 )
                 
                 print("[SETUP] Esperando inicialización del servidor...")
                 time.sleep(4)
                 
                 if cls.is_port_in_use(8080):
-                    print("✅ SingletonProxyObserverServer iniciado correctamente en puerto 8080")
+                    print("✅ Servidor iniciado correctamente en puerto 8080")
                 else:
                     print("❌ Error: Servidor no pudo iniciarse")
                     if cls.server_process:
@@ -91,17 +93,17 @@ class TestAcceptanceSingletonClient(unittest.TestCase):
                 cls.server_process = None
                 raise
         else:
-            print("❌ Archivo SingletonProxyObserver.py no encontrado")
-            raise FileNotFoundError("SingletonProxyObserver.py no encontrado")
+            print("❌ Archivo main.py no encontrado en carpeta servidor/")
+            raise FileNotFoundError("servidor/main.py no encontrado")
     
     @classmethod
     def find_server_file(cls):
-        """Busca el archivo del servidor"""
+        """Busca el archivo main.py del servidor en la nueva estructura"""
         possible_paths = [
-            Path(__file__).parent / 'SingletonProxyObserver.py',
-            Path(__file__).parent.parent / 'SingletonProxyObserver.py',
-            Path(__file__).parent / 'SingletonProxyObserverTPFI.py',
-            Path(__file__).parent.parent / 'SingletonProxyObserverTPFI.py',
+            # Desde test/test.py -> ../servidor/main.py
+            Path(__file__).parent.parent / 'servidor' / 'main.py',
+            # Desde raíz -> servidor/main.py
+            Path(__file__).parent / 'servidor' / 'main.py',
         ]
         
         for path in possible_paths:
@@ -401,7 +403,8 @@ class TestAcceptanceSingletonClient(unittest.TestCase):
             [sys.executable, str(server_file)],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            cwd=str(server_file.parent)
         )
         
         print(f"\n[STDOUT]")
@@ -586,7 +589,8 @@ class TestAcceptanceSingletonClient(unittest.TestCase):
                 [sys.executable, str(server_file), 'start', '-p', '8080'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                cwd=str(server_file.parent)
             )
             
             time.sleep(2)
@@ -686,7 +690,7 @@ def generate_test_report():
     with open(report_file, 'w', encoding='utf-8') as f:
         f.write("="*80 + "\n")
         f.write("REPORTE DE TEST DE ACEPTACIÓN\n")
-        f.write("SingletonClient & SingletonProxyObserverServer\n")
+        f.write("SingletonClient & Servidor Modular\n")
         f.write("="*80 + "\n\n")
         f.write(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
