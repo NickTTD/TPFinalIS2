@@ -9,4 +9,36 @@
     "id": "Prueba2",
     "cp": "3260",
     "ACTION": "set"
+}{
+    "timestamp": "2025-11-05 18:06:56",
+    "notification_number": 0,
+    "type": "subscription_confirmation",
+    "data": {
+        "status": "subscribed",
+        "uuid": "00000000-0000-0000-0000-74563c591fce",
+        "message": "Cliente suscrito exitosamente. Recibirá notificaciones de cambios."
+    }
+}
+{
+    "timestamp": "2025-11-05 18:07:33",
+    "notification_number": 1,
+    "type": "data_update",
+    "data": {
+        "action": "update",
+        "record": {
+            "id": "MFND-001",
+            "seqID": "100",
+            "web": "https://www.test.com",
+            "CUIT": "30-52653875-5",
+            "localidad": "Herrera",
+            "provincia": "Entre Ríos",
+            "sede": "Facultad Regional Concepción del Uruguay",
+            "idSeq": "2001",
+            "idreq": "BocaJRS",
+            "telefono": "0343 422-4096",
+            "domicilio": "Almafuerte 1033",
+            "cp": "3100"
+        },
+        "timestamp": "2025-11-05T18:07:33.506329"
+    }
 }
