@@ -114,8 +114,10 @@ class ClientConnection:
         try:
             self.client_socket.close()
             self.request_handler.log(f"Conexión cerrada con {self.address}")
-        except:
-            pass
+        except OSError as e:
+            logging.debug(f"Error al cerrar socket: {e}")
+        except Exception as e:
+            logging.error(f"Error inesperado al cerrar conexión: {e}")
     
     def listen_for_unsubscribe(self):
         """Escucha por mensajes adicionales del cliente suscrito (principalmente UNSUBSCRIBE)"""

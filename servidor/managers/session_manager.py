@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 managers/session_manager.py - Gestor de sesiones
 Patrón Singleton

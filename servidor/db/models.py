@@ -20,7 +20,8 @@ class LogEntry:
         self.uuid = uuid
         self.session = session
         self.action = action
-        self.timestamp = datetime.now().isoformat()
+        # Usar timestamp UTC para consistencia global
+        self.timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         self.record_id = record_id
         self.additional_data = additional_data
     

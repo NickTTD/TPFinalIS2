@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 managers/observer_manager.py - Gestor de observers
 Patrón Observer + Singleton

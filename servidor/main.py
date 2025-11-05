@@ -16,7 +16,7 @@ from server import SingletonProxyObserverServer
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(
-        description='Servidor Proxy con patrones Singleton y Observer para CorporateData (OOP)',
+        description='Servidor Proxy con patrones Singleton y Observer para CorporateData',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     

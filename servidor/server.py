@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 server.py - Servidor principal
 Integra todos los componentes
@@ -56,7 +55,7 @@ class SingletonProxyObserverServer:
             logging.info("="*70)
             logging.info(f"Escuchando en puerto: {self.port}")
             logging.info(f"Modo verbose: {'Activado' if self.verbose else 'Desactivado'}")
-            logging.info(f"Tablas DynamoDB: CorporateData, CorporateLog")
+            logging.info("Tablas DynamoDB: CorporateData, CorporateLog")
             logging.info("="*70)
             logging.info("Esperando conexiones...")
             

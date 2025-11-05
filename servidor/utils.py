@@ -6,8 +6,6 @@ Conversión de tipos y configuración de logging
 
 import logging
 from decimal import Decimal
-from typing import Any
-
 
 class DecimalConverter:
     """Utilidad para conversión de tipos Decimal de DynamoDB"""

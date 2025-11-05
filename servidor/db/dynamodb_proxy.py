@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 db/dynamodb_proxy.py - Proxy para acceso a DynamoDB
 Patrón Proxy + Singleton

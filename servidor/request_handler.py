@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 request_handler.py - Gestor de solicitudes
 Procesa las acciones del cliente
@@ -7,7 +6,7 @@ Procesa las acciones del cliente
 import logging
 import socket
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from db import DynamoDBProxy, CorporateDataRecord, LogEntry
 from managers import ObserverManager, SessionManager
